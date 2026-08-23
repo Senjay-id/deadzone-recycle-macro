@@ -84,7 +84,7 @@ namespace Macro
 
         private void InitializeComponent()
         {
-            this.Text = "Dead Zone Recycle Macro";
+            this.Text = "Dead Zone Recycle Macro by Senjay";
             this.Size = new Size(500, 580);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.TopMost = true;
@@ -109,17 +109,17 @@ namespace Macro
             mainPanel.SetColumnSpan(lblMousePos, 2);
 
             // Row 1-3: Locations
-            mainPanel.Controls.Add(new Label { Text = "Location 1 (X,Y):", TextAlign = ContentAlignment.MiddleRight }, 0, 1);
+            mainPanel.Controls.Add(new Label { Text = "Item position:", TextAlign = ContentAlignment.MiddleRight }, 0, 1);
             txtLocation1 = new TextBox { Text = "100,100", Dock = DockStyle.Fill };
             mainPanel.Controls.Add(txtLocation1, 1, 1);
             mainPanel.SetColumnSpan(txtLocation1, 2);
 
-            mainPanel.Controls.Add(new Label { Text = "Location 2 (X,Y):", TextAlign = ContentAlignment.MiddleRight }, 0, 2);
+            mainPanel.Controls.Add(new Label { Text = "Recycle button:", TextAlign = ContentAlignment.MiddleRight }, 0, 2);
             txtLocation2 = new TextBox { Text = "200,200", Dock = DockStyle.Fill };
             mainPanel.Controls.Add(txtLocation2, 1, 2);
             mainPanel.SetColumnSpan(txtLocation2, 2);
 
-            mainPanel.Controls.Add(new Label { Text = "Location 3 (X,Y):", TextAlign = ContentAlignment.MiddleRight }, 0, 3);
+            mainPanel.Controls.Add(new Label { Text = "Confirm button:", TextAlign = ContentAlignment.MiddleRight }, 0, 3);
             txtLocation3 = new TextBox { Text = "300,300", Dock = DockStyle.Fill };
             mainPanel.Controls.Add(txtLocation3, 1, 3);
             mainPanel.SetColumnSpan(txtLocation3, 2);
@@ -175,7 +175,7 @@ namespace Macro
             // Row 7: Keybind info
             lblKeybindInfo = new Label
             {
-                Text = "Press 'P' key to force stop the macro",
+                Text = "F1=Set Item | F2=Set Recycle | F3=Set Confirm | P=Stop Macro",
                 Dock = DockStyle.Fill,
                 ForeColor = Color.DarkOrange,
                 Font = new Font(this.Font, FontStyle.Bold),
@@ -222,6 +222,84 @@ namespace Macro
                     HandlePKeyPress();
                 });
             }
+            // Check for F1, F2, F3 keys to set mouse positions
+            else if (key == Keys.F1)
+            {
+                this.Invoke((MethodInvoker)delegate {
+                    SetCurrentMousePositionToItemPosition();
+                });
+            }
+            else if (key == Keys.F2)
+            {
+                this.Invoke((MethodInvoker)delegate {
+                    SetCurrentMousePositionToRecycleButton();
+                });
+            }
+            else if (key == Keys.F3)
+            {
+                this.Invoke((MethodInvoker)delegate {
+                    SetCurrentMousePositionToConfirmButton();
+                });
+            }
+        }
+
+        private void SetCurrentMousePositionToItemPosition()
+        {
+            Point mousePos = Cursor.Position;
+            txtLocation1.Text = $"{mousePos.X},{mousePos.Y}";
+            lblStatus.Text = $"Status: Item position set to X: {mousePos.X}, Y: {mousePos.Y}";
+            lblStatus.ForeColor = Color.Blue;
+
+            // Auto-save the settings
+            SaveSettings();
+
+            // Reset status after 3 seconds
+            ResetStatusAfterDelay();
+        }
+
+        private void SetCurrentMousePositionToRecycleButton()
+        {
+            Point mousePos = Cursor.Position;
+            txtLocation2.Text = $"{mousePos.X},{mousePos.Y}";
+            lblStatus.Text = $"Status: Recycle button set to X: {mousePos.X}, Y: {mousePos.Y}";
+            lblStatus.ForeColor = Color.Blue;
+
+            // Auto-save the settings
+            SaveSettings();
+
+            // Reset status after 3 seconds
+            ResetStatusAfterDelay();
+        }
+
+        private void SetCurrentMousePositionToConfirmButton()
+        {
+            Point mousePos = Cursor.Position;
+            txtLocation3.Text = $"{mousePos.X},{mousePos.Y}";
+            lblStatus.Text = $"Status: Confirm button set to X: {mousePos.X}, Y: {mousePos.Y}";
+            lblStatus.ForeColor = Color.Blue;
+
+            // Auto-save the settings
+            SaveSettings();
+
+            // Reset status after 3 seconds
+            ResetStatusAfterDelay();
+        }
+
+        private void ResetStatusAfterDelay()
+        {
+            var timer = new System.Windows.Forms.Timer();
+            timer.Interval = 3000;
+            timer.Tick += (s, ev) =>
+            {
+                if (!isMacroRunning)
+                {
+                    lblStatus.Text = "Status: Ready";
+                    lblStatus.ForeColor = Color.Green;
+                }
+                timer.Stop();
+                timer.Dispose();
+            };
+            timer.Start();
         }
 
         private void Form1_KeyDown(object sender, KeyEventArgs e)
@@ -232,6 +310,25 @@ namespace Macro
                 e.Handled = true;
                 e.SuppressKeyPress = true;
                 HandlePKeyPress();
+            }
+            // Check for F1, F2, F3 keys when form has focus
+            else if (e.KeyCode == Keys.F1)
+            {
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                SetCurrentMousePositionToItemPosition();
+            }
+            else if (e.KeyCode == Keys.F2)
+            {
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                SetCurrentMousePositionToRecycleButton();
+            }
+            else if (e.KeyCode == Keys.F3)
+            {
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                SetCurrentMousePositionToConfirmButton();
             }
         }
 
