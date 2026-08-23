@@ -1,6 +1,6 @@
 Manual recycle macro for [Dead Zone Revive](https://store.steampowered.com/app/3919900/Dead_Zone_Revive/)
 
-![img](https://i.imgur.com/IBLXkWy.png)
+![img](https://i.imgur.com/CsuPkk7.png)
 
 
 # Building
