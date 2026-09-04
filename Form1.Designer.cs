@@ -1,5 +1,6 @@
 ﻿using Macro;
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -46,6 +47,7 @@ namespace Macro
         private Button btnStart, btnStop;
         private Label lblStatus;
         private CheckBox chkAlwaysOnTop;
+        private CheckBox chkRandomDelay;
         private ComboBox cmbDelayType;
         private Label lblKeybindInfo;
 
@@ -85,7 +87,7 @@ namespace Macro
         private void InitializeComponent()
         {
             this.Text = "Dead Zone Recycle Macro by Senjay";
-            this.Size = new Size(500, 580);
+            this.Size = new Size(500, 620);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.TopMost = true;
 
@@ -93,7 +95,7 @@ namespace Macro
             {
                 Dock = DockStyle.Fill,
                 Padding = new Padding(10),
-                RowCount = 11,
+                RowCount = 12,
                 ColumnCount = 3
             };
 
@@ -162,6 +164,15 @@ namespace Macro
             mainPanel.Controls.Add(cmbDelayType, 2, 5);
 
             // Row 6: Always on Top checkbox
+            var topPanel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                Padding = new Padding(0)
+            };
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+
             chkAlwaysOnTop = new CheckBox
             {
                 Text = "Always on Top",
@@ -169,20 +180,19 @@ namespace Macro
                 Checked = true
             };
             chkAlwaysOnTop.CheckedChanged += ChkAlwaysOnTop_CheckedChanged;
-            mainPanel.Controls.Add(chkAlwaysOnTop, 0, 6);
-            mainPanel.SetColumnSpan(chkAlwaysOnTop, 3);
 
-            // Row 7: Keybind info
-            lblKeybindInfo = new Label
+            chkRandomDelay = new CheckBox
             {
-                Text = "F1=Set Item | F2=Set Recycle | F3=Set Confirm | P=Stop Macro",
+                Text = "Random Delay (1-1000ms)",
                 Dock = DockStyle.Fill,
-                ForeColor = Color.DarkOrange,
-                Font = new Font(this.Font, FontStyle.Bold),
-                TextAlign = ContentAlignment.MiddleCenter
+                Checked = false
             };
-            mainPanel.Controls.Add(lblKeybindInfo, 0, 7);
-            mainPanel.SetColumnSpan(lblKeybindInfo, 3);
+            chkRandomDelay.CheckedChanged += ChkRandomDelay_CheckedChanged;
+
+            topPanel.Controls.Add(chkAlwaysOnTop, 0, 0);
+            topPanel.Controls.Add(chkRandomDelay, 1, 0);
+            mainPanel.Controls.Add(topPanel, 0, 6);
+            mainPanel.SetColumnSpan(topPanel, 3);
 
             // Row 8: Control buttons
             btnStart = new Button { Text = "Start Macro", Dock = DockStyle.Fill };
@@ -465,6 +475,44 @@ namespace Macro
             }
         }
 
+        private void ChkRandomDelay_CheckedChanged(object sender, EventArgs e)
+        {
+            SaveSettings();
+
+            if (chkRandomDelay.Checked)
+            {
+                lblStatus.Text = "Status: Random Delay - Enabled (Adds 1-1000ms to base delay)";
+                lblStatus.ForeColor = Color.Blue;
+                // Note: The delay input stays enabled - it's used as the base delay!
+            }
+            else
+            {
+                if (!isMacroRunning)
+                {
+                    lblStatus.Text = "Status: Ready";
+                    lblStatus.ForeColor = Color.Green;
+                }
+            }
+
+            // Reset status after 2 seconds if not running
+            if (!isMacroRunning)
+            {
+                var timer = new System.Windows.Forms.Timer();
+                timer.Interval = 2000;
+                timer.Tick += (s, ev) =>
+                {
+                    if (!isMacroRunning)
+                    {
+                        lblStatus.Text = "Status: Ready";
+                        lblStatus.ForeColor = Color.Green;
+                    }
+                    timer.Stop();
+                    timer.Dispose();
+                };
+                timer.Start();
+            }
+        }
+
         private void TimerMousePosition_Tick(object sender, EventArgs e)
         {
             Point mousePos = Cursor.Position;
@@ -539,6 +587,12 @@ namespace Macro
                                     this.TopMost = topMost;
                                 }
                                 break;
+                            case "RandomDelay":
+                                if (bool.TryParse(value, out bool randomDelay))
+                                {
+                                    chkRandomDelay.Checked = randomDelay;
+                                }
+                                break;
                         }
                     }
 
@@ -572,7 +626,6 @@ namespace Macro
                 StringBuilder sb = new StringBuilder();
 
                 sb.AppendLine("; Automatically generated config");
-                //sb.AppendLine("; Generated on: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                 sb.AppendLine();
 
                 sb.AppendLine($"Location1={txtLocation1.Text}");
@@ -582,6 +635,7 @@ namespace Macro
                 sb.AppendLine($"Delay={numDelay.Value}");
                 sb.AppendLine($"DelayType={cmbDelayType.SelectedIndex}");
                 sb.AppendLine($"AlwaysOnTop={chkAlwaysOnTop.Checked}");
+                sb.AppendLine($"RandomDelay={chkRandomDelay.Checked}");
 
                 File.WriteAllText(iniFilePath, sb.ToString());
             }
@@ -652,6 +706,8 @@ namespace Macro
         {
             try
             {
+                Random random = new Random();  // Random number generator
+
                 for (int i = 0; i < loopCount && !shouldStopMacro; i++)
                 {
                     if (shouldStopMacro) break;
@@ -702,16 +758,52 @@ namespace Macro
                     });
                     Thread.Sleep(100);
 
+                    // Calculate base delay
+                    int baseDelayMs;
+                    string baseDelayDisplay;
+
+                    if (delayInSeconds)
+                    {
+                        baseDelayMs = (int)(numDelay.Value * 1000);
+                        baseDelayDisplay = $"{numDelay.Value}s";
+                    }
+                    else
+                    {
+                        baseDelayMs = (int)numDelay.Value;
+                        baseDelayDisplay = $"{numDelay.Value}ms";
+                    }
+
+                    // Calculate total delay
+                    int totalDelayMs = baseDelayMs;
+                    string totalDelayDisplay = baseDelayDisplay;
+
+                    if (chkRandomDelay.Checked)
+                    {
+                        // Generate random delay between 1-1000ms and ADD it to the base delay
+                        int randomAddMs = random.Next(1, 1001);
+                        totalDelayMs = baseDelayMs + randomAddMs;
+                        totalDelayDisplay = $"{baseDelayDisplay} + {randomAddMs}ms = {totalDelayMs}ms total";
+                    }
+
                     // Update status with delay info
-                    string delayUnit = delayInSeconds ? "s" : "ms";
                     this.Invoke((MethodInvoker)delegate {
-                        lblStatus.Text = $"Status: Running - Loop {i + 1}/{loopCount} (Delay: {numDelay.Value}{delayUnit}) | Press 'P' to stop)";
+                        if (chkRandomDelay.Checked)
+                        {
+                            // Show the combined delay value in the status
+                            lblStatus.Text = $"Status: Running - Loop {i + 1}/{loopCount} | Total Delay: {totalDelayDisplay} | Press 'P' to stop";
+                            lblStatus.ForeColor = Color.Orange;  // Orange to highlight random mode
+                        }
+                        else
+                        {
+                            lblStatus.Text = $"Status: Running - Loop {i + 1}/{loopCount} (Delay: {baseDelayDisplay}) | Press 'P' to stop";
+                            lblStatus.ForeColor = Color.Red;
+                        }
                     });
 
-                    // Delay between loops
+                    // Delay between loops using the TOTAL delay
                     if (i < loopCount - 1 && !shouldStopMacro)
                     {
-                        Thread.Sleep(delayMs);
+                        Thread.Sleep(totalDelayMs);
                     }
                 }
 
@@ -720,6 +812,19 @@ namespace Macro
                     {
                         lblStatus.Text = "Status: Stopped";
                         lblStatus.ForeColor = Color.Red;
+                    }
+                    else
+                    {
+                        if (chkRandomDelay.Checked)
+                        {
+                            lblStatus.Text = "Status: Macro completed with random delays added!";
+                            lblStatus.ForeColor = Color.Green;
+                        }
+                        else
+                        {
+                            lblStatus.Text = "Status: Macro completed!";
+                            lblStatus.ForeColor = Color.Green;
+                        }
                     }
                     StopMacro();
                 });
